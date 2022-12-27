@@ -1,16 +1,31 @@
-
-resource "aws_instance" "tf_instance" {
+resource "aws_instance" "tf_cw_instance" {
   #ubuntu 22.04
   ami                  = "ami-0574da719dca65348"
   instance_type        = "t2.micro"
-  iam_instance_profile = aws_iam_instance_profile.tf_ssm_instance_profile.name
+  iam_instance_profile = aws_iam_instance_profile.tf_cw_instance_profile.name
   key_name             = var.instance_public_key_name
-  security_groups      = [aws_security_group.tf_instance_security_group.name]
+  security_groups      = [aws_security_group.tf_cw_instance_security_group.name]
+  monitoring           = true
+}
+
+resource "aws_cloudwatch_metric_alarm" "cpu_alarm" {
+  alarm_name          = "cpu alarm"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = "1"
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/EC2"
+  period              = "10"      #seconds
+  statistic           = "Average"
+  threshold           = "15"
+
+  dimensions = {
+    InstanceId = aws_instance.tf_cw_instance.id
+  }
 }
 
 
-resource "aws_security_group" "tf_instance_security_group" {
-  name = "tf_ssm_security_group"
+resource "aws_security_group" "tf_cw_instance_security_group" {
+  name = "tf_cw_security_group"
 
   dynamic "ingress" {
     for_each = toset(local.instance.ports_in)
@@ -35,13 +50,13 @@ resource "aws_security_group" "tf_instance_security_group" {
 }
 
 
-resource "aws_iam_instance_profile" "tf_ssm_instance_profile" {
-  name = "tf_ssm_instance_profile"
-  role = aws_iam_role.tf_profile_role.name
+resource "aws_iam_instance_profile" "tf_cw_instance_profile" {
+  name = "tf_cw_instance_profile"
+  role = aws_iam_role.tf_cw_profile_role.name
 }
 
-resource "aws_iam_role" "tf_profile_role" {
-  name = "tf_ssm_profile_role"
+resource "aws_iam_role" "tf_cw_profile_role" {
+  name = "tf_cw_profile_role"
 
   managed_policy_arns = ["arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"]
 

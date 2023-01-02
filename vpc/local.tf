@@ -60,13 +60,19 @@ locals {
 
 
   subnets = flatten([
-    for az_name, params in local.az_subnets :[
-      for subnet_type, subnet_params in params :{
-        az_name     = az_name
-        subnet_type = subnet_type
-        cidr_block  = subnet_params.cidr_block
-        public      = subnet_params.public
-      }
-    ]
+  for az_name, params in local.az_subnets :[
+  for subnet_type, subnet_params in params :{
+    az_name     = az_name
+    subnet_type = subnet_type
+    cidr_block  = subnet_params.cidr_block
+    public      = subnet_params.public
+  }
+  ]
   ])
+
+
+  instance = {
+    ports_in  = [22]
+    ports_out = [0]
+  }
 }

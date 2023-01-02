@@ -12,15 +12,6 @@ resource "aws_internet_gateway" "igw" {
 resource "aws_route_table" "vpc_route_table" {
   vpc_id = aws_vpc.vpc.id
 
-  #  public ipv4 subnet routes
-  #  dynamic "route" {
-  #    for_each = {for subnet in local.subnets : "${subnet.az_name}-${subnet.subnet_type}" => subnet if subnet.public}
-  #    content {
-  #      cidr_block = route.value.cidr_block
-  #      gateway_id = aws_internet_gateway.igw.id
-  #    }
-  #  }
-
   # these are fine since routing is done based on the most specific match and there are local
   # routes that match the vpc for both ipv4 and ipv6
   route {
@@ -52,8 +43,51 @@ resource "aws_subnet" "vpc_public_subnet" {
   availability_zone       = each.value.az_name
 }
 
+# this is to use count, to overcome the limitations of for_each
+locals {
+  public_subnets = values(aws_subnet.vpc_public_subnet)[*].id
+}
+
 resource "aws_route_table_association" "route_table_association" {
-  for_each       = toset(values(aws_subnet.vpc_public_subnet)[*].id) # got from terraform console
-  subnet_id      = each.value
+  count          = length(local.public_subnets)
+  subnet_id      = local.public_subnets[count.index]
   route_table_id = aws_route_table.vpc_route_table.id
+}
+
+
+resource "aws_instance" "jumpbox_instance" {
+  #ubuntu 22.04
+  ami                    = "ami-0574da719dca65348"
+  instance_type          = "t2.micro"
+  key_name               = var.instance_public_key_name
+  # get the id of the first public subnet from the map
+  subnet_id              = sort((values(aws_subnet.vpc_public_subnet)[*].id))[0]
+  vpc_security_group_ids = [aws_security_group.jumpbox_instance_security_group.id]
+}
+
+
+resource "aws_security_group" "jumpbox_instance_security_group" {
+  name   = "jumpbox_security_group"
+  vpc_id = aws_vpc.vpc.id
+
+  dynamic "ingress" {
+    for_each = toset(local.instance.ports_in)
+    content {
+      description = "Inbound"
+      from_port   = ingress.value
+      to_port     = ingress.value
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
+  }
+  dynamic "egress" {
+    for_each = toset(local.instance.ports_out)
+    content {
+      description = "Outbound"
+      from_port   = egress.value
+      to_port     = egress.value
+      protocol    = "-1"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
+  }
 }

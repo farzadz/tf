@@ -1,4 +1,3 @@
-
 resource "aws_instance" "tf_instance" {
   #ubuntu 22.04
   ami                  = "ami-0574da719dca65348"
@@ -6,6 +5,16 @@ resource "aws_instance" "tf_instance" {
   iam_instance_profile = aws_iam_instance_profile.tf_ssm_instance_profile.name
   key_name             = var.instance_public_key_name
   security_groups      = [aws_security_group.tf_instance_security_group.name]
+  user_data            = <<EOF
+#!/bin/bash
+apt remove landscape-client landscape-common
+rm -f /etc/motd
+apt update && apt install -y cowsay update-motd
+echo "#!/bin/sh" > /etc/update-motd.d/40-cow
+echo '/usr/games/cowsay "Ubuntu 22.04"' >> /etc/update-motd.d/40-cow
+chmod 755 /etc/update-motd.d/40-cow
+update-motd
+EOF
 }
 
 
